@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8퍼즐 알고리즘 탐험</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f9ff;
+        }
+        h1, h2, .game-font {
+            font-family: 'Jua', sans-serif;
+        }
+        .tile {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .tile:active {
+            transform: scale(0.95);
+        }
+        .tile-empty {
+            background-color: transparent;
+            box-shadow: none;
+            cursor: default;
+        }
+        .solving .tile {
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .highlight {
+            animation: pulse 1s infinite;
+            border: 3px solid #FCD34D;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* 탭 애니메이션 */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center min-h-screen text-gray-800 pb-10">
+
+    <!-- 헤더 -->
+    <header class="w-full bg-blue-500 text-white p-4 shadow-md text-center">
+        <h1 class="text-3xl font-bold">🧩 8퍼즐 알고리즘 탐험대</h1>
+        <p class="mt-2 text-blue-100">놀면서 배우는 인공지능의 기초!</p>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="w-full max-w-4xl p-4 flex flex-col md:flex-row gap-8 mt-6">
+        
+        <!-- 왼쪽: 게임 영역 -->
+        <div class="flex-1 flex flex-col items-center">
+            <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm border-4 border-blue-200">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="text-xl game-font text-blue-600">이동 횟수: <span id="moveCount">0</span></div>
+                    <div class="text-sm text-gray-500" id="statusText">직접 풀어보세요!</div>
+                </div>
+
+                <!-- 8퍼즐 그리드 -->
+                <div id="gameBoard" class="grid grid-cols-3 gap-2 bg-blue-100 p-2 rounded-xl mb-6 aspect-square">
+                    <!-- 자바스크립트로 타일 생성 -->
+                </div>
+
+                <!-- 컨트롤 버튼 -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="shuffleBoard()" id="shuffleBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl transition shadow-md flex items-center justify-center gap-2">
+                        <i class="fas fa-random"></i> 섞기
+                    </button>
+                    <button onclick="solveWithAI()" id="solveBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-xl transition shadow-md flex items-center justify-center gap-2 relative">
+                        <i class="fas fa-robot"></i> AI 해결사
+                        <span id="aiThinking" class="absolute -top-2 -right-2 hidden">
+                            <span class="flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-pink-500"></span>
+                            </span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded text-sm w-full max-w-sm">
+                <p><strong>💡 팁:</strong> 숫자를 1부터 8까지 순서대로 나열하면 성공이에요!</p>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 학습 영역 -->
+        <div class="flex-1 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden flex flex-col">
+            <!-- 탭 메뉴 -->
+            <div class="flex border-b">
+                <button onclick="openTab('intro')" class="tab-btn flex-1 py-3 font-bold text-gray-500 hover:text-blue-500 hover:bg-blue-50 transition active" data-tab="intro">퍼즐이란?</button>
+                <button onclick="openTab('algo')" class="tab-btn flex-1 py-3 font-bold text-gray-500 hover:text-blue-500 hover:bg-blue-50 transition" data-tab="algo">AI의 비밀</button>
+                <button onclick="openTab('astar')" class="tab-btn flex-1 py-3 font-bold text-gray-500 hover:text-blue-500 hover:bg-blue-50 transition" data-tab="astar">천재 알고리즘</button>
+            </div>
+
+            <!-- 탭 내용 -->
+            <div class="p-6 flex-1 overflow-y-auto max-h-[500px]">
+                
+                <!-- 탭 1: 퍼즐 소개 -->
+                <div id="intro" class="tab-content active">
+                    <h2 class="text-2xl text-blue-600 mb-4">👋 안녕! 8퍼즐의 세계로 온 걸 환영해</h2>
+                    <p class="mb-4 leading-relaxed">
+                        이 게임은 1870년대에 발명되어 전 세계 사람들을 골치 아프게 했던 <strong>'15퍼즐'</strong>의 동생 버전인 8퍼즐이야.
+                    </p>
+                    <div class="bg-blue-50 p-4 rounded-xl mb-4 text-center">
+                        <i class="fas fa-th text-4xl text-blue-400 mb-2"></i>
+                        <p>빈 칸을 이용해서 숫자를 1, 2, 3... 순서대로 맞추는 게임이지.</p>
+                    </div>
+                    <p class="leading-relaxed">
+                        쉬워 보이지? 하지만 마구 섞여 있는 상태에서 정답을 찾으려면 수천, 수만 가지의 경우의 수를 생각해야 해. 
+                        사람은 직감으로 풀지만, 컴퓨터는 <strong>'알고리즘'</strong>이라는 논리적인 방법을 사용해서 순식간에 풀어내지!
+                    </p>
+                </div>
+
+                <!-- 탭 2: AI의 비밀 (알고리즘 기초) -->
+                <div id="algo" class="tab-content">
+                    <h2 class="text-2xl text-purple-600 mb-4">🤖 컴퓨터는 어떻게 생각할까?</h2>
+                    <p class="mb-4">
+                        컴퓨터에게 8퍼즐은 거대한 <strong>'미로 찾기'</strong>와 같아. 현재 상태에서 빈칸을 위, 아래, 왼쪽, 오른쪽으로 옮길 때마다 새로운 길이 생겨나는 거지.
+                    </p>
+                    
+                    <h3 class="text-lg font-bold text-gray-700 mt-6 mb-2">1. 무식하게 다 찾아보기 (BFS)</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="text-4xl">🐢</div>
+                        <p class="text-sm bg-gray-100 p-2 rounded">
+                            "갈 수 있는 모든 길을 다 가볼 거야!"<br>
+                            확실하지만 너무 느려. 경우의 수가 너무 많거든.
+                        </p>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-gray-700 mt-6 mb-2">2. 똑똑하게 추측하기 (휴리스틱)</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="text-4xl">🐰</div>
+                        <p class="text-sm bg-purple-100 p-2 rounded">
+                            "정답이랑 가까워 보이는 쪽으로 먼저 가볼래!"<br>
+                            이게 바로 <strong>AI의 핵심</strong>이야.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 탭 3: A* 알고리즘 -->
+                <div id="astar" class="tab-content">
+                    <h2 class="text-2xl text-green-600 mb-4">🌟 A*(에이 스타) 알고리즘</h2>
+                    <p class="mb-4">
+                        지금 왼쪽의 'AI 해결사' 버튼에는 <strong>A* 알고리즘</strong>이 들어있어. 내비게이션이 가장 빠른 길을 찾는 원리랑 똑같아!
+                    </p>
+
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                        <h4 class="font-bold text-gray-700 mb-2">점수 매기는 법 (F = G + H)</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-start gap-2">
+                                <span class="bg-blue-200 px-2 rounded font-bold text-xs mt-1">G</span>
+                                <span><strong>지금까지 온 거리:</strong> 시작점에서 몇 번 움직였나?</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="bg-red-200 px-2 rounded font-bold text-xs mt-1">H</span>
+                                <span><strong>남은 거리(예상):</strong> 정답까지 얼마나 남았나? (이걸 잘 맞히는 게 기술!)</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <p class="text-sm text-gray-600">
+                        AI는 각 숫자 타일이 제자리(정답 위치)에서 얼마나 멀리 떨어져 있는지 계산해. 이걸 <strong>'맨해튼 거리'</strong>라고 부르는데, 이 거리가 짧아지는 방향을 최우선으로 선택한단다.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 게임 로직 ---
+        const gameBoard = document.getElementById('gameBoard');
+        const moveCountSpan = document.getElementById('moveCount');
+        const statusText = document.getElementById('statusText');
+        
+        let tiles = [1, 2, 3, 4, 5, 6, 7, 8, 0]; // 0은 빈칸
+        let isSolving = false;
+        let moveCount = 0;
+
+        // 게임 초기화 및 렌더링
+        function renderBoard() {
+            gameBoard.innerHTML = '';
+            tiles.forEach((num, index) => {
+                const tile = document.createElement('div');
+                tile.className = `tile h-full rounded-lg flex items-center justify-center text-3xl font-bold select-none ${
+                    num === 0 
+                    ? 'tile-empty' 
+                    : 'bg-white text-blue-600 border border-blue-200'
+                }`;
+                
+                if (num !== 0) {
+                    tile.textContent = num;
+                    tile.onclick = () => handleTileClick(index);
+                }
+                
+                // 정답 위치에 있으면 초록색 틴트 (시각적 피드백)
+                if (num !== 0 && num === index + 1) {
+                    tile.classList.add('bg-green-50', 'text-green-600');
+                    tile.classList.remove('bg-white', 'text-blue-600');
+                }
+
+                gameBoard.appendChild(tile);
+            });
+        }
+
+        // 타일 클릭 핸들러
+        function handleTileClick(index) {
+            if (isSolving) return;
+
+            const emptyIndex = tiles.indexOf(0);
+            if (isAdjacent(index, emptyIndex)) {
+                swap(index, emptyIndex);
+                moveCount++;
+                updateUI();
+                checkWin();
+            }
+        }
+
+        // 인접 여부 확인 (상하좌우)
+        function isAdjacent(idx1, idx2) {
+            const row1 = Math.floor(idx1 / 3);
+            const col1 = idx1 % 3;
+            const row2 = Math.floor(idx2 / 3);
+            const col2 = idx2 % 3;
+            return Math.abs(row1 - row2) + Math.abs(col1 - col2) === 1;
+        }
+
+        // 타일 교환
+        function swap(idx1, idx2) {
+            [tiles[idx1], tiles[idx2]] = [tiles[idx2], tiles[idx1]];
+        }
+
+        // UI 업데이트
+        function updateUI() {
+            moveCountSpan.textContent = moveCount;
+            renderBoard();
+        }
+
+        // 승리 조건 확인
+        function checkWin() {
+            const winState = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+            const isWin = tiles.every((val, index) => val === winState[index]);
+            if (isWin && !isSolving) {
+                statusText.textContent = "🎉 축하해요! 퍼즐을 완성했어요!";
+                statusText.classList.add('text-green-600', 'font-bold');
+                confettiEffect();
+            }
+        }
+
+        // 섞기 (무작위 이동 방식으로 풀 수 있는 상태만 생성)
+        function shuffleBoard() {
+            if (isSolving) return;
+            
+            // 정답 상태에서 시작
+            tiles = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+            moveCount = 0;
+            statusText.textContent = "직접 풀어보세요!";
+            statusText.classList.remove('text-green-600', 'font-bold');
+
+            // 무작위로 150번 이동 시뮬레이션
+            let emptyIdx = 8;
+            for (let i = 0; i < 150; i++) {
+                const neighbors = [];
+                const row = Math.floor(emptyIdx / 3);
+                const col = emptyIdx % 3;
+
+                if (row > 0) neighbors.push(emptyIdx - 3);
+                if (row < 2) neighbors.push(emptyIdx + 3);
+                if (col > 0) neighbors.push(emptyIdx - 1);
+                if (col < 2) neighbors.push(emptyIdx + 1);
+
+                const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+                swap(emptyIdx, randomNeighbor);
+                emptyIdx = randomNeighbor;
+            }
+            renderBoard();
+        }
+
+        // --- A* 알고리즘 구현 (AI 해결사) ---
+        
+        // 맨해튼 거리 (Heuristic) 계산
+        function getManhattanDistance(board) {
+            let distance = 0;
+            for (let i = 0; i < 9; i++) {
+                const value = board[i];
+                if (value !== 0) {
+                    const targetX = (value - 1) % 3;
+                    const targetY = Math.floor((value - 1) / 3);
+                    const currentX = i % 3;
+                    const currentY = Math.floor(i / 3);
+                    distance += Math.abs(currentX - targetX) + Math.abs(currentY - targetY);
+                }
+            }
+            return distance;
+        }
+
+        // A* 알고리즘 메인 함수
+        async function solveWithAI() {
+            if (isSolving) return;
+            // 이미 정답이면 실행 안함
+            if (tiles.every((v, i) => v === (i === 8 ? 0 : i + 1))) {
+                statusText.textContent = "이미 완성되어 있어요!";
+                return;
+            }
+
+            isSolving = true;
+            document.body.classList.add('solving');
+            document.getElementById('aiThinking').classList.remove('hidden');
+            statusText.textContent = "AI가 생각 중입니다... 🧠";
+
+            // UI 렌더링을 위해 잠시 대기
+            await new Promise(r => setTimeout(r, 100));
+
+            const startState = [...tiles];
+            const goalState = [1, 2, 3, 4, 5, 6, 7, 8, 0].toString();
+            
+            // Priority Queue를 배열로 단순 구현
+            let openSet = [{
+                board: startState,
+                g: 0,
+                h: getManhattanDistance(startState),
+                path: [] // 경로 기록
+            }];
+            let closedSet = new Set();
+
+            let solutionPath = null;
+            let iterations = 0;
+
+            while (openSet.length > 0 && iterations < 5000) { // 안전장치
+                iterations++;
+                // f(g+h)가 가장 낮은 노드 선택
+                openSet.sort((a, b) => (a.g + a.h) - (b.g + b.h));
+                const current = openSet.shift();
+                const currentBoardStr = current.board.toString();
+
+                if (currentBoardStr === goalState) {
+                    solutionPath = current.path;
+                    break;
+                }
+
+                closedSet.add(currentBoardStr);
+
+                // 이웃 노드 탐색
+                const emptyIdx = current.board.indexOf(0);
+                const row = Math.floor(emptyIdx / 3);
+                const col = emptyIdx % 3;
+                const moves = [];
+
+                if (row > 0) moves.push(emptyIdx - 3); // 상
+                if (row < 2) moves.push(emptyIdx + 3); // 하
+                if (col > 0) moves.push(emptyIdx - 1); // 좌
+                if (col < 2) moves.push(emptyIdx + 1); // 우
+
+                for (let moveIdx of moves) {
+                    const newBoard = [...current.board];
+                    [newBoard[emptyIdx], newBoard[moveIdx]] = [newBoard[moveIdx], newBoard[emptyIdx]];
+                    
+                    if (closedSet.has(newBoard.toString())) continue;
+
+                    openSet.push({
+                        board: newBoard,
+                        g: current.g + 1,
+                        h: getManhattanDistance(newBoard),
+                        path: [...current.path, moveIdx] // 타일을 moveIdx에서 emptyIdx로 옮김
+                    });
+                }
+            }
+
+            // 애니메이션 실행
+            if (solutionPath) {
+                document.getElementById('aiThinking').classList.add('hidden');
+                statusText.textContent = `AI가 ${solutionPath.length}번 만에 푸는 방법을 찾았어요!`;
+                
+                for (let i = 0; i < solutionPath.length; i++) {
+                    const moveIdx = solutionPath[i]; // 0이 이동할 위치 (즉, 클릭할 타일 위치)
+                    // 현재 0의 위치 찾기
+                    const zeroIdx = tiles.indexOf(0);
+                    // moveIdx에 있는 타일을 0 위치로 옮기는 것과 동일
+                    
+                    swap(zeroIdx, moveIdx);
+                    moveCount++;
+                    updateUI();
+                    
+                    // 각 이동마다 딜레이
+                    await new Promise(r => setTimeout(r, 400));
+                }
+                statusText.textContent = "AI가 해결했습니다! 😎";
+                confettiEffect();
+            } else {
+                statusText.textContent = "너무 복잡해서 풀 수 없어요 ㅠㅠ";
+            }
+
+            isSolving = false;
+            document.body.classList.remove('solving');
+            document.getElementById('aiThinking').classList.add('hidden');
+        }
+
+        // 간단한 탭 전환 스크립트
+        function openTab(tabName) {
+            const contents = document.getElementsByClassName('tab-content');
+            for (let content of contents) content.classList.remove('active');
+            
+            const btns = document.getElementsByClassName('tab-btn');
+            for (let btn of btns) {
+                btn.classList.remove('text-blue-500', 'bg-blue-50', 'active');
+                btn.classList.add('text-gray-500');
+            }
+
+            document.getElementById(tabName).classList.add('active');
+            const activeBtn = document.querySelector(`button[data-tab="${tabName}"]`);
+            activeBtn.classList.add('text-blue-500', 'bg-blue-50', 'active');
+            activeBtn.classList.remove('text-gray-500');
+        }
+
+        // 폭죽 효과 (간단 버전)
+        function confettiEffect() {
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'];
+            for(let i=0; i<30; i++) {
+                const conf = document.createElement('div');
+                conf.style.position = 'absolute';
+                conf.style.left = '50%';
+                conf.style.top = '50%';
+                conf.style.width = '10px';
+                conf.style.height = '10px';
+                conf.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+                conf.style.transition = 'all 1s ease-out';
+                conf.style.zIndex = 1000;
+                document.body.appendChild(conf);
+
+                setTimeout(() => {
+                    const x = (Math.random() - 0.5) * 500;
+                    const y = (Math.random() - 0.5) * 500;
+                    conf.style.transform = `translate(${x}px, ${y}px) rotate(${Math.random()*360}deg)`;
+                    conf.style.opacity = 0;
+                }, 10);
+
+                setTimeout(() => conf.remove(), 1000);
+            }
+        }
+
+        // 초기 실행
+        shuffleBoard();
+    </script>
+</body>
+</html>
